@@ -12,6 +12,8 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Objects;
 
 public class Secondary {
 
@@ -24,7 +26,7 @@ public class Secondary {
             // split lines by comma
             String reg = ",(?!\\s)";
             String[] res = input.split(reg);
-            if (res[2] == "" || res[7] == "" || res[37] == "") {
+            if (Objects.equals(res[2], "") || Objects.equals(res[7], "") || Objects.equals(res[37], "")) {
                 return;
             }
             FlightKey flightKey = FlightKey.createFlightKey(res[7],res[2]);
@@ -45,8 +47,32 @@ public class Secondary {
 
 
     public static class SecondaryReducer extends Reducer<FlightKey, Text, Text, Text> {
-        public void reduce(FlightKey flightKey, Text value, Text outputKey, Text outputValue) {
-
+        public void reduce(FlightKey flightKey, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+            // System.out.println(flightKey.toString());
+            String flightName = flightKey.getAirlineName().toString();
+            String s = "";
+            ArrayList<String> delays = new ArrayList<>();
+            double delaySum = 0.0;
+            int delayCount = 0;
+            int prevMonth = 1;
+            for (Text value: values) {
+                int m = Integer.parseInt(flightKey.getMonth().toString());
+                if (m == prevMonth) {
+                    delayCount += 1;
+                    delaySum += Double.parseDouble(value.toString());
+                } else if (delayCount != 0){
+                    int ave = (int) (delaySum / delayCount);
+                    delays.add("("+prevMonth+","+ave+")");
+                    delayCount = 0;
+                    delaySum = 0.0;
+                    prevMonth = m;
+                }
+            }
+            if (delayCount != 0) {
+                int ave = (int) (delaySum / delayCount);
+                delays.add("("+(prevMonth+1)+","+ave+")");
+            }
+            context.write(new Text(flightKey.getAirlineName()), new Text(delays.toString()));
         }
     }
 
