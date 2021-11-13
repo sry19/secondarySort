@@ -29,6 +29,9 @@ public class Secondary {
             if (Objects.equals(res[2], "") || Objects.equals(res[7], "") || Objects.equals(res[37], "")) {
                 return;
             }
+            if (!res[41].equals("0.00") || !res[43].equals("0.00")) {
+                return;
+            }
             FlightKey flightKey = FlightKey.createFlightKey(res[7],res[2]);
             if (flightKey == null) {
                 return;
@@ -40,7 +43,7 @@ public class Secondary {
     public static class SecondaryPartitioner extends Partitioner<FlightKey, Text> {
         @Override
         public int getPartition(FlightKey flightKey, Text delay, int numPartitions) {
-            return flightKey.hashCode() % numPartitions;
+            return (flightKey.hashCode() & Integer.MAX_VALUE) % numPartitions;
         }
     }
 
@@ -61,7 +64,7 @@ public class Secondary {
                     delayCount += 1;
                     delaySum += Double.parseDouble(value.toString());
                 } else if (delayCount != 0){
-                    int ave = (int) (delaySum / delayCount);
+                    int ave = (int) Math.ceil(delaySum / delayCount);
                     delays.add("("+prevMonth+","+ave+")");
                     delayCount = 0;
                     delaySum = 0.0;
@@ -69,8 +72,8 @@ public class Secondary {
                 }
             }
             if (delayCount != 0) {
-                int ave = (int) (delaySum / delayCount);
-                delays.add("("+(prevMonth+1)+","+ave+")");
+                int ave = (int) Math.ceil(delaySum / delayCount);
+                delays.add("("+(prevMonth)+","+ave+")");
             }
             context.write(new Text(flightKey.getAirlineName()), new Text(delays.toString()));
         }
